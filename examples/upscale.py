@@ -28,7 +28,7 @@ def save_result_image(resp_json):
 if __name__ == '__main__':
     payload = {
         "source_image": encode_image_to_base64(SOURCE_IMAGE),
-        "model": "",
+        "model": "RealESRGAN_x2plus",
         "scale": 2,
         "face_enhance": True
     }
