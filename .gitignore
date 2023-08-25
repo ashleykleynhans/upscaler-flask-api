@@ -1,0 +1,11 @@
+venv/*
+.vscode
+.idea
+*.jpg
+*.log
+.DS_Store
+checkpoints
+CodeFormer
+__pycache__
+.eggs
+realesrgan.egg-info
