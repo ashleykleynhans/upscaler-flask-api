@@ -9,3 +9,5 @@ CodeFormer
 __pycache__
 .eggs
 realesrgan.egg-info
+ESRGAN/
+gfpgan/

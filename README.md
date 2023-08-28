@@ -57,6 +57,7 @@ wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_
 ```bash
 cd ../..
 mkdir -p GFPGAN/models
+cd GFPGAN/models
 wget https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.3.pth
 ```
 
