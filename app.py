@@ -8,14 +8,19 @@ import base64
 import cv2
 import logging
 import time
+import json
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from realesrgan import RealESRGANer
 from PIL import Image
+from flask import Flask, request, jsonify, make_response
 
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
 LOG_LEVEL = logging.DEBUG
 TMP_PATH = '/tmp/upscaler'
-script_dir = os.path.dirname(os.path.abspath(__file__))
+GPU_ID = 0
+MODELS_PATH = f'{script_dir}/ESRGAN/models'
+GFPGAN_MODEL_PATH = f'{script_dir}/GFPGAN/models/GFPGANv1.3.pth'
 log_path = ''
 
 # Mac does not have permission to /var/log for example
@@ -198,8 +203,6 @@ def upscale(
 
 
 def determine_file_extension(image_data):
-    image_extension = None
-
     try:
         if image_data.startswith('/9j/'):
             image_extension = '.jpg'
@@ -259,10 +262,10 @@ def ping():
     ), 200)
 
 
-@app.route('/faceswap', methods=['POST'])
-def face_swap_api():
+@app.route('/upscale', methods=['POST'])
+def upscaling_api():
     total_timer = Timer()
-    logging.debug('Received face swap API request')
+    logging.debug('Received upscaling API request')
     payload = request.get_json()
 
     if not os.path.exists(TMP_PATH):
@@ -271,7 +274,6 @@ def face_swap_api():
 
     unique_id = uuid.uuid4()
     source_image_data = payload['source_image']
-    target_image_data = payload['target_image']
 
     # Decode the source image data
     source_image = base64.b64decode(source_image_data)
@@ -282,63 +284,42 @@ def face_swap_api():
     with open(source_image_path, 'wb') as source_file:
         source_file.write(source_image)
 
-    # Decode the target image data
-    target_image = base64.b64decode(target_image_data)
-    target_file_extension = determine_file_extension(target_image_data)
-    target_image_path = f'{TMP_PATH}/target_{unique_id}{target_file_extension}'
-
-    # Save the target image to disk
-    with open(target_image_path, 'wb') as target_file:
-        target_file.write(target_image)
-
     # Set defaults if they are not specified in the payload
-    if 'source_indexes' not in payload:
-        payload['source_indexes'] = '-1'
+    if 'model' not in payload:
+        payload['model'] = 'RealESRGAN_x4plus'
 
-    if 'target_indexes' not in payload:
-        payload['target_indexes'] = '-1'
+    if 'scale' not in payload:
+        payload['scale'] = 2
 
-    if 'background_enhance' not in payload:
-        payload['background_enhance'] = True
+    if 'face_enhance' not in payload:
+        payload['face_enhance'] = False
 
-    if 'face_restore' not in payload:
-        payload['face_restore'] = True
+    if 'tile' not in payload:
+        payload['tile'] = 0
 
-    if 'face_upsample' not in payload:
-        payload['face_upsample'] = True
+    if 'tile_pad' not in payload:
+        payload['tile_pad'] = 10
 
-    if 'upscale' not in payload:
-        payload['upscale'] = 1
-
-    if 'codeformer_fidelity' not in payload:
-        payload['codeformer_fidelity'] = 0.5
-
-    if 'output_format' not in payload:
-        payload['output_format'] = 'JPEG'
-
-    print(json.dumps(payload, indent=4, default=str))
+    if 'pre_pad' not in payload:
+        payload['pre_pad'] = 0
 
     try:
-        logging.debug(f'Source indexes: {payload["source_indexes"]}')
-        logging.debug(f'Target indexes: {payload["target_indexes"]}')
-        logging.debug(f'Background enhance: {payload["background_enhance"]}')
-        logging.debug(f'Face Restoration: {payload["face_restore"]}')
-        logging.debug(f'Face Upsampling: {payload["face_upsample"]}')
-        logging.debug(f'Upscale: {payload["upscale"]}')
-        logging.debug(f'Codeformer Fidelity: {payload["codeformer_fidelity"]}')
-        logging.debug(f'Output Format: {payload["output_format"]}')
+        logging.debug(f'Model: {payload["model"]}')
+        logging.debug(f'Scale: {payload["scale"]}')
+        logging.debug(f'Face enhance: {payload["face_enhance"]}')
+        logging.debug(f'Tile: {payload["tile"]}')
+        logging.debug(f'Tile Pad: {payload["tile_pad"]}')
+        logging.debug(f'Pre Pad: {payload["pre_pad"]}')
 
-        result_image = face_swap(
+        result_image = upscale(
             source_image_path,
-            target_image_path,
-            payload['source_indexes'],
-            payload['target_indexes'],
-            payload['background_enhance'],
-            payload['face_restore'],
-            payload['face_upsample'],
-            payload['upscale'],
-            payload['codeformer_fidelity'],
-            payload['output_format']
+            source_file_extension,
+            payload['model'],
+            payload['scale'],
+            payload['face_enhance'],
+            payload['tile'],
+            payload['tile_pad'],
+            payload['pre_pad']
         )
 
         status_code = 200
@@ -352,7 +333,7 @@ def face_swap_api():
 
         response = {
             'status': 'error',
-            'msg': 'Face swap failed',
+            'msg': 'Upscaling failed',
             'detail': str(e)
         }
 
@@ -360,10 +341,9 @@ def face_swap_api():
 
     # Clean up temporary images
     os.remove(source_image_path)
-    os.remove(target_image_path)
 
     total_time = total_timer.get_elapsed_time()
-    logging.info(f'Total time taken for face swap API call {total_time} seconds')
+    logging.info(f'Total time taken for upscaling API call {total_time} seconds')
 
     return make_response(jsonify(response), status_code)
 
