@@ -13,6 +13,7 @@ from basicsr.archs.rrdbnet_arch import RRDBNet
 from realesrgan import RealESRGANer
 from PIL import Image
 from flask import Flask, request, jsonify, make_response
+from waitress import serve
 
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -351,7 +352,8 @@ def upscaling_api():
 if __name__ == '__main__':
     args = get_args()
 
-    app.run(
+    serve(
+        app,
         host=args.host,
         port=args.port
     )
